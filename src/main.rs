@@ -1,5 +1,7 @@
 use std::io::{self, Write};
 
+const BUILTIN_CMDS: [&str; 3] = ["echo", "exit", "type"];
+
 fn main() {
     let stdin = io::stdin();
     let mut input = String::new();
@@ -16,6 +18,15 @@ fn main() {
 
         if let Some(c) = cmd.next() {
             match c {
+                "type" => {
+                    if let Some(c) = cmd.next() {
+                        if BUILTIN_CMDS.contains(&c) {
+                            print!("{} is a shell builtin\n", c);
+                        } else {
+                            print!("{}: not found\n", c);
+                        }
+                    }
+                }
                 "echo" => {
                     loop {
                         if let Some(c) = cmd.next() {

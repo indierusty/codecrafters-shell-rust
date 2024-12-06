@@ -1,12 +1,21 @@
-#[allow(unused_imports)]
 use std::io::{self, Write};
 
 fn main() {
-    print!("$ ");
-    io::stdout().flush().unwrap();
-
-    // Wait for user input
     let stdin = io::stdin();
-    let mut input = String::new();
-    stdin.read_line(&mut input).unwrap();
+    let mut cmd = String::new();
+
+    loop {
+        cmd.clear();
+
+        print!("$ ");
+        io::stdout().flush().unwrap();
+
+        stdin.read_line(&mut cmd).unwrap();
+        match &cmd {
+            invalid => {
+                print!("{}: command not found\n", invalid.trim_end());
+            }
+        }
+        io::stdout().flush().unwrap();
+    }
 }

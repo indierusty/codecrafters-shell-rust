@@ -2,18 +2,29 @@ use std::io::{self, Write};
 
 fn main() {
     let stdin = io::stdin();
-    let mut cmd = String::new();
+    let mut input = String::new();
 
     loop {
-        cmd.clear();
-
         print!("$ ");
         io::stdout().flush().unwrap();
 
-        stdin.read_line(&mut cmd).unwrap();
-        match &cmd {
-            invalid => {
-                print!("{}: command not found\n", invalid.trim_end());
+        input.clear();
+        stdin.read_line(&mut input).unwrap();
+
+        let mut exit_status = 0;
+        let mut cmd = input.trim_end().split(' ').peekable();
+
+        if let Some(c) = cmd.next() {
+            match c {
+                "exit" => {
+                    if let Some(es) = cmd.next() {
+                        exit_status = es.parse().unwrap();
+                    }
+                    std::process::exit(exit_status);
+                }
+                invalid => {
+                    print!("{}: command not found\n", invalid.trim_end());
+                }
             }
         }
         io::stdout().flush().unwrap();

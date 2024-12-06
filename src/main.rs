@@ -16,6 +16,19 @@ fn main() {
 
         if let Some(c) = cmd.next() {
             match c {
+                "echo" => {
+                    loop {
+                        if let Some(c) = cmd.next() {
+                            print!("{}", c);
+                            if cmd.peek() != None {
+                                print!(" ");
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+                    print!("\n");
+                }
                 "exit" => {
                     if let Some(es) = cmd.next() {
                         exit_status = es.parse().unwrap();

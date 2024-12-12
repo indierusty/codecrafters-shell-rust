@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::io::{self, Write};
+use std::process::Command;
 use std::{env, fs};
 
 const BUILTIN_CMDS: [&str; 3] = ["echo", "exit", "type"];
@@ -24,11 +25,14 @@ fn main() -> anyhow::Result<()> {
                     if let Some(cmd) = cmds.next() {
                         if BUILTIN_CMDS.contains(&cmd) {
                             print!("{} is a shell builtin\n", cmd);
-                        } else if path_cmds()?.contains_key(cmd) {
-                            let path = &path_cmds()?[cmd];
-                            print!("{} is {}/{}\n", cmd, path, cmd)
                         } else {
-                            print!("{}: not found\n", cmd);
+                            let path_cmds = path_cmds()?;
+                            if path_cmds.contains_key(cmd) {
+                                let path = &path_cmds[cmd];
+                                print!("{} is {}/{}\n", cmd, path, cmd)
+                            } else {
+                                print!("{}: not found\n", cmd);
+                            }
                         }
                     }
                 }
@@ -51,8 +55,20 @@ fn main() -> anyhow::Result<()> {
                     }
                     std::process::exit(exit_status);
                 }
-                invalid => {
-                    print!("{}: command not found\n", invalid.trim_end());
+                cmd => {
+                    let path_cmds = path_cmds()?;
+                    if path_cmds.contains_key(cmd) {
+                        let path = format!("{}/{}", path_cmds[cmd], cmd);
+                        let output = Command::new(path)
+                            .args(cmds)
+                            .output()
+                            .expect("failed to execute process");
+
+                        io::stdout().write_all(&output.stdout).unwrap();
+                        io::stderr().write_all(&output.stderr).unwrap();
+                    } else {
+                        print!("{}: command not found\n", cmd.trim_end());
+                    }
                 }
             }
         }

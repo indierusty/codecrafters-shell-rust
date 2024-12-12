@@ -59,13 +59,10 @@ fn main() -> anyhow::Result<()> {
                     let path_cmds = path_cmds()?;
                     if path_cmds.contains_key(cmd) {
                         let path = format!("{}/{}", path_cmds[cmd], cmd);
-                        let output = Command::new(path)
+                        Command::new(path)
                             .args(cmds)
-                            .output()
+                            .status()
                             .expect("failed to execute process");
-
-                        io::stdout().write_all(&output.stdout).unwrap();
-                        io::stderr().write_all(&output.stderr).unwrap();
                     } else {
                         print!("{}: command not found\n", cmd.trim_end());
                     }

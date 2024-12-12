@@ -1,8 +1,10 @@
+use std::collections::HashMap;
 use std::io::{self, Write};
+use std::{env, fs};
 
 const BUILTIN_CMDS: [&str; 3] = ["echo", "exit", "type"];
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     let stdin = io::stdin();
     let mut input = String::new();
 
@@ -14,24 +16,27 @@ fn main() {
         stdin.read_line(&mut input).unwrap();
 
         let mut exit_status = 0;
-        let mut cmd = input.trim_end().split(' ').peekable();
+        let mut cmds = input.trim_end().split(' ').peekable();
 
-        if let Some(c) = cmd.next() {
+        if let Some(c) = cmds.next() {
             match c {
                 "type" => {
-                    if let Some(c) = cmd.next() {
-                        if BUILTIN_CMDS.contains(&c) {
-                            print!("{} is a shell builtin\n", c);
+                    if let Some(cmd) = cmds.next() {
+                        if BUILTIN_CMDS.contains(&cmd) {
+                            print!("{} is a shell builtin\n", cmd);
+                        } else if path_cmds()?.contains_key(cmd) {
+                            let path = &path_cmds()?[cmd];
+                            print!("{} is {}/{}\n", cmd, path, cmd)
                         } else {
-                            print!("{}: not found\n", c);
+                            print!("{}: not found\n", cmd);
                         }
                     }
                 }
                 "echo" => {
                     loop {
-                        if let Some(c) = cmd.next() {
+                        if let Some(c) = cmds.next() {
                             print!("{}", c);
-                            if cmd.peek() != None {
+                            if cmds.peek() != None {
                                 print!(" ");
                             }
                         } else {
@@ -41,7 +46,7 @@ fn main() {
                     print!("\n");
                 }
                 "exit" => {
-                    if let Some(es) = cmd.next() {
+                    if let Some(es) = cmds.next() {
                         exit_status = es.parse().unwrap();
                     }
                     std::process::exit(exit_status);
@@ -53,4 +58,32 @@ fn main() {
         }
         io::stdout().flush().unwrap();
     }
+}
+
+fn path_cmds() -> anyhow::Result<HashMap<String, String>> {
+    let mut cmds = HashMap::new();
+
+    let key = "PATH";
+    if let Some(paths) = env::var_os(key) {
+        for path in env::split_paths(&paths) {
+            for entry in fs::read_dir(&path)? {
+                let entry = entry?;
+                if entry.path().is_file() {
+                    let cmd = entry
+                        .path()
+                        .file_name()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .to_owned();
+                    let path = path.clone().to_str().unwrap().to_owned();
+
+                    cmds.entry(cmd).or_insert(path);
+                }
+            }
+        }
+    } else {
+        println!("{key} is not defined in the environment.");
+    }
+    Ok(cmds)
 }

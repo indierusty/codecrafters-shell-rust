@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use std::process::Command;
 use std::{env, fs};
 
-const BUILTIN_CMDS: [&str; 4] = ["echo", "exit", "type", "pwd"];
+const BUILTIN_CMDS: [&str; 5] = ["cd", "echo", "exit", "type", "pwd"];
 
 fn main() -> anyhow::Result<()> {
     let stdin = io::stdin();
@@ -21,6 +21,13 @@ fn main() -> anyhow::Result<()> {
 
         if let Some(c) = cmds.next() {
             match c {
+                "cd" => {
+                    if let Some(path) = cmds.next() {
+                        if let Err(_) = env::set_current_dir(path) {
+                            print!("cd: {}: No such file or directory\n", path)
+                        }
+                    }
+                }
                 "pwd" => {
                     let pwd = env::current_dir()?;
                     let pwd = pwd.to_str().unwrap();

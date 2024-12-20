@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use std::process::Command;
 use std::{env, fs};
 
-const BUILTIN_CMDS: [&str; 3] = ["echo", "exit", "type"];
+const BUILTIN_CMDS: [&str; 4] = ["echo", "exit", "type", "pwd"];
 
 fn main() -> anyhow::Result<()> {
     let stdin = io::stdin();
@@ -21,6 +21,11 @@ fn main() -> anyhow::Result<()> {
 
         if let Some(c) = cmds.next() {
             match c {
+                "pwd" => {
+                    let pwd = env::current_dir()?;
+                    let pwd = pwd.to_str().unwrap();
+                    print!("{}\n", pwd);
+                }
                 "type" => {
                     if let Some(cmd) = cmds.next() {
                         if BUILTIN_CMDS.contains(&cmd) {

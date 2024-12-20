@@ -22,6 +22,18 @@ fn main() -> anyhow::Result<()> {
         if let Some(c) = cmds.next() {
             match c {
                 "cd" => {
+                    if cmds.peek() == Some(&"~") {
+                        cmds.next();
+                        let key = "HOME";
+                        if let Some(home_path) = env::var_os(key) {
+                            if let Err(_) = env::set_current_dir(&home_path) {
+                                print!(
+                                    "cd: {}: No such file or directory\n",
+                                    home_path.into_string().unwrap()
+                                )
+                            }
+                        }
+                    }
                     if let Some(path) = cmds.next() {
                         if let Err(_) = env::set_current_dir(path) {
                             print!("cd: {}: No such file or directory\n", path)

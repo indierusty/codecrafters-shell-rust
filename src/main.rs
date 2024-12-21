@@ -32,18 +32,19 @@ fn parse_cmds(src: &str) -> Vec<String> {
                 _ = src.next_if_eq(&'"'); // consume closing quote
                 cmds.push(cmd);
             }
-            Some('\\') => {
-                _ = src.next();
-                let cmd = parse_escape_character(&mut src);
-                cmds.push(cmd);
-            }
             _ => {
                 let mut cmd = String::new();
                 'a: loop {
                     if let Some(c) =
-                        src.next_if(|c| !(['\'', '"', '\\'].contains(c) || c.is_whitespace()))
+                        src.next_if(|c| !(['"', '\''].contains(c) || c.is_whitespace()))
                     {
-                        cmd.push(c);
+                        if c == '\\' {
+                            if let Some(c) = src.next() {
+                                cmd.push(c);
+                            }
+                        } else {
+                            cmd.push(c);
+                        }
                     } else {
                         break 'a;
                     }
@@ -56,18 +57,16 @@ fn parse_cmds(src: &str) -> Vec<String> {
     cmds
 }
 
-fn parse_escape_character(src: &mut Peekable<Chars<'_>>) -> String {
-    todo!()
-}
-
 fn parse_double_quote(src: &mut Peekable<Chars<'_>>) -> String {
     let mut cmd = String::new();
 
     while let Some(c) = src.next_if(|c| *c != '"') {
         match c {
             '\\' => {
-                if let Some(c) = src.next() {
+                if let Some(c) = src.next_if(|c| ['$', '`', '"', '\\'].contains(c)) {
                     cmd.push(c);
+                } else {
+                    cmd.push('\\');
                 }
             }
             c => cmd.push(c),

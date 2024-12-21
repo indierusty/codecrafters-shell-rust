@@ -61,7 +61,20 @@ fn parse_escape_character(src: &mut Peekable<Chars<'_>>) -> String {
 }
 
 fn parse_double_quote(src: &mut Peekable<Chars<'_>>) -> String {
-    todo!()
+    let mut cmd = String::new();
+
+    while let Some(c) = src.next_if(|c| *c != '"') {
+        match c {
+            '\\' => {
+                if let Some(c) = src.next() {
+                    cmd.push(c);
+                }
+            }
+            c => cmd.push(c),
+        }
+    }
+
+    cmd
 }
 
 fn parse_single_quote(src: &mut Peekable<Chars<'_>>) -> String {

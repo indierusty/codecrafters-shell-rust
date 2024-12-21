@@ -1,9 +1,76 @@
 use std::collections::HashMap;
 use std::io::{self, Write};
+use std::iter::Peekable;
 use std::process::Command;
+use std::str::Chars;
 use std::{env, fs};
 
 const BUILTIN_CMDS: [&str; 5] = ["cd", "echo", "exit", "type", "pwd"];
+
+fn parse_cmds(src: &str) -> Vec<String> {
+    let mut cmds: Vec<String> = Vec::new();
+    let mut src = src.chars().peekable();
+
+    loop {
+        match src.peek() {
+            None => {
+                break;
+            }
+            Some(c) if c.is_whitespace() => {
+                _ = src.next(); // consume white space
+                continue;
+            }
+            Some('\'') => {
+                _ = src.next(); // consume opening quote
+                let cmd = parse_single_quote(&mut src);
+                _ = src.next_if_eq(&'\''); // consume closing quote
+                cmds.push(cmd);
+            }
+            Some('"') => {
+                _ = src.next(); // consume opening quote
+                let cmd = parse_double_quote(&mut src);
+                _ = src.next_if_eq(&'"'); // consume closing quote
+                cmds.push(cmd);
+            }
+            Some('\\') => {
+                _ = src.next();
+                let cmd = parse_escape_character(&mut src);
+                cmds.push(cmd);
+            }
+            _ => {
+                let mut cmd = String::new();
+                'a: loop {
+                    if let Some(c) =
+                        src.next_if(|c| !(['\'', '"', '\\'].contains(c) || c.is_whitespace()))
+                    {
+                        cmd.push(c);
+                    } else {
+                        break 'a;
+                    }
+                }
+                cmds.push(cmd);
+            }
+        }
+    }
+
+    cmds
+}
+
+fn parse_escape_character(src: &mut Peekable<Chars<'_>>) -> String {
+    todo!()
+}
+
+fn parse_double_quote(src: &mut Peekable<Chars<'_>>) -> String {
+    todo!()
+}
+
+fn parse_single_quote(src: &mut Peekable<Chars<'_>>) -> String {
+    let mut cmd = String::new();
+    while let Some(c) = src.next_if(|c| *c != '\'') {
+        cmd.push(c);
+    }
+    cmd
+}
 
 fn main() -> anyhow::Result<()> {
     let stdin = io::stdin();
@@ -17,7 +84,9 @@ fn main() -> anyhow::Result<()> {
         stdin.read_line(&mut input).unwrap();
 
         let mut exit_status = 0;
-        let mut cmds = input.trim_end().split(' ').peekable();
+        let cmds = parse_cmds(&input);
+        let mut cmds = cmds.iter().map(|s| s.as_str()).peekable();
+        // let mut cmds = input.trim_end().split(' ').peekable();
 
         if let Some(c) = cmds.next() {
             match c {

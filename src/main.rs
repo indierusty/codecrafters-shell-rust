@@ -171,19 +171,20 @@ fn main() -> anyhow::Result<()> {
             i += 1;
             match cmd.as_str() {
                 "cd" => {
+                    let res = String::new();
+                    let mut err = String::new();
+
                     if i < cmds.len() && cmds[i] == "~" {
                         i += 1;
                         let key = "HOME";
                         if let Some(home_path) = env::var_os(key) {
                             if let Err(_) = env::set_current_dir(&home_path) {
-                                write(
-                                    &stderr_redirection,
-                                    Channel::Stderr,
+                                err.push_str(
                                     format!(
                                         "cd: {}: No such file or directory\n",
                                         home_path.into_string().unwrap()
                                     )
-                                    .as_bytes(),
+                                    .as_str(),
                                 );
                             }
                         }
@@ -192,24 +193,22 @@ fn main() -> anyhow::Result<()> {
                         let path = &cmds[i];
                         i += 1;
                         if let Err(_) = env::set_current_dir(path) {
-                            // print!("cd: {}: No such file or directory\n", path);
-                            write(
-                                &stderr_redirection,
-                                Channel::Stderr,
-                                format!("cd: {}: No such file or directory\n", path).as_bytes(),
+                            err.push_str(
+                                format!("cd: {}: No such file or directory\n", path).as_str(),
                             );
                         }
                         _ = i; // NOTE: just to remove unused assignment warning
                     }
+                    write(&stdout_redirection, Channel::Stdout, res.as_bytes());
+                    write(&stderr_redirection, Channel::Stderr, err.as_bytes());
                 }
                 "pwd" => {
                     let pwd = env::current_dir()?;
                     let pwd = pwd.to_str().unwrap();
-                    write(
-                        &stdout_redirection,
-                        Channel::Stdout,
-                        format!("{}\n", pwd).as_bytes(),
-                    );
+                    let res = format!("{}\n", pwd);
+                    let err = String::new();
+                    write(&stdout_redirection, Channel::Stdout, res.as_bytes());
+                    write(&stderr_redirection, Channel::Stderr, err.as_bytes());
                     // print!("{}\n", pwd);
                 }
                 "type" => {
@@ -219,23 +218,23 @@ fn main() -> anyhow::Result<()> {
                         i += 1;
                         _ = i;
 
-                        let res;
+                        let mut res = String::new();
+                        let mut err = String::new();
 
                         if BUILTIN_CMDS.contains(&cmd.as_str()) {
-                            res = Some(format!("{} is a shell builtin\n", cmd));
+                            res.push_str(format!("{} is a shell builtin\n", cmd).as_str());
                         } else {
                             let path_cmds = path_cmds()?;
                             if path_cmds.contains_key(cmd.as_str()) {
                                 let path = &path_cmds[cmd];
-                                res = Some(format!("{} is {}/{}\n", cmd, path, cmd));
+                                res.push_str(format!("{} is {}/{}\n", cmd, path, cmd).as_str());
                             } else {
-                                res = Some(format!("{}: not found\n", cmd));
+                                err.push_str(format!("{}: not found\n", cmd).as_str());
                             }
                         }
 
-                        if let Some(res) = res {
-                            write(&stdout_redirection, Channel::Stdout, res.as_bytes());
-                        }
+                        write(&stdout_redirection, Channel::Stdout, res.as_bytes());
+                        write(&stderr_redirection, Channel::Stderr, err.as_bytes());
                     }
                 }
                 "echo" => {
@@ -252,6 +251,7 @@ fn main() -> anyhow::Result<()> {
                     }
                     res.push('\n');
                     write(&stdout_redirection, Channel::Stdout, res.as_bytes());
+                    write(&stderr_redirection, Channel::Stderr, &[]);
                 }
                 "exit" => {
                     if i < cmds.len() {

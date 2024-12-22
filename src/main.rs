@@ -1,87 +1,97 @@
 use std::collections::HashMap;
 use std::io::{self, Write};
-use std::iter::Peekable;
 use std::process::Command;
-use std::str::Chars;
 use std::{env, fs};
 
 const BUILTIN_CMDS: [&str; 5] = ["cd", "echo", "exit", "type", "pwd"];
 
-fn parse_cmds(src: &str) -> Vec<String> {
-    let mut cmds: Vec<String> = Vec::new();
-    let mut src = src.chars().peekable();
+enum ParseState {
+    None,
+    SingleQuote,
+    DoubleQuote,
+    BackSlash,
+}
+
+fn parse(src: &str) -> Vec<String> {
+    let src: Vec<char> = src.chars().collect();
+    let mut i = 0;
+    let mut state = ParseState::None;
+    let mut cmds = Vec::new();
+    let mut cmd = String::new();
 
     loop {
-        match src.peek() {
-            None => {
-                break;
-            }
-            Some(c) if c.is_whitespace() => {
-                _ = src.next(); // consume white space
-                continue;
-            }
-            Some('\'') => {
-                _ = src.next(); // consume opening quote
-                let cmd = parse_single_quote(&mut src);
-                _ = src.next_if_eq(&'\''); // consume closing quote
-                cmds.push(cmd);
-            }
-            Some('"') => {
-                _ = src.next(); // consume opening quote
-                let cmd = parse_double_quote(&mut src);
-                _ = src.next_if_eq(&'"'); // consume closing quote
-                cmds.push(cmd);
-            }
-            _ => {
-                let mut cmd = String::new();
-                'a: loop {
-                    if let Some(c) =
-                        src.next_if(|c| !(['"', '\''].contains(c) || c.is_whitespace()))
-                    {
-                        if c == '\\' {
-                            if let Some(c) = src.next() {
-                                cmd.push(c);
-                            }
-                        } else {
-                            cmd.push(c);
+        match state {
+            ParseState::None => {
+                if i >= src.len() {
+                    if !cmd.is_empty() {
+                        cmds.push(cmd.clone());
+                        cmd.clear();
+                    }
+                    break;
+                }
+                if i < src.len() {
+                    match src[i] {
+                        '\'' => {
+                            i += 1; // consume single quote
+                            state = ParseState::SingleQuote;
                         }
-                    } else {
-                        break 'a;
+                        '"' => {
+                            i += 1; // consume double quote
+                            state = ParseState::DoubleQuote;
+                        }
+                        '\\' => {
+                            i += 1; // consume backslash quote
+                            state = ParseState::BackSlash;
+                        }
+                        c if c.is_whitespace() => {
+                            if !cmd.is_empty() {
+                                cmds.push(cmd.clone());
+                                cmd.clear();
+                            }
+                            i += 1;
+                        }
+                        c => {
+                            cmd.push(c);
+                            i += 1;
+                        }
                     }
                 }
-                cmds.push(cmd);
+            }
+            ParseState::SingleQuote => {
+                while i < src.len() && src[i] != '\'' {
+                    cmd.push(src[i]);
+                    i += 1;
+                }
+                i += 1; // consume single quote
+                state = ParseState::None;
+            }
+            ParseState::DoubleQuote => {
+                while i < src.len() && src[i] != '"' {
+                    if src[i] == '\\'
+                        && i + 1 < src.len()
+                        && ['\\', '$', '"', '`', '\n'].contains(&src[i + 1])
+                    {
+                        i += 1;
+                        cmd.push(src[i]);
+                    } else {
+                        cmd.push(src[i]);
+                    }
+                    i += 1;
+                }
+                i += 1; // consume double quote
+                state = ParseState::None;
+            }
+            ParseState::BackSlash => {
+                if i < src.len() {
+                    cmd.push(src[i]);
+                    i += 1;
+                }
+                state = ParseState::None;
             }
         }
     }
 
     cmds
-}
-
-fn parse_double_quote(src: &mut Peekable<Chars<'_>>) -> String {
-    let mut cmd = String::new();
-
-    while let Some(c) = src.next_if(|c| *c != '"') {
-        match c {
-            '\\' => {
-                if let Some(c) = src.next_if(|c| ['$', '`', '"', '\\'].contains(c)) {
-                    cmd.push(c);
-                } else {
-                    cmd.push('\\');
-                }
-            }
-            c => cmd.push(c),
-        }
-    }
-
-    cmd
-}
-
-fn parse_single_quote(src: &mut Peekable<Chars<'_>>) -> String {
-    let mut cmd = String::new();
-    while let Some(c) = src.next_if(|c| *c != '\'') {
-        cmd.push(c);
-    }
-    cmd
 }
 
 fn main() -> anyhow::Result<()> {
@@ -96,15 +106,16 @@ fn main() -> anyhow::Result<()> {
         stdin.read_line(&mut input).unwrap();
 
         let mut exit_status = 0;
-        let cmds = parse_cmds(&input);
-        let mut cmds = cmds.iter().map(|s| s.as_str()).peekable();
-        // let mut cmds = input.trim_end().split(' ').peekable();
+        let mut i = 0;
+        let cmds = parse(&input);
 
-        if let Some(c) = cmds.next() {
-            match c {
+        if i < cmds.len() {
+            let cmd = &cmds[i];
+            i += 1;
+            match cmd.as_str() {
                 "cd" => {
-                    if cmds.peek() == Some(&"~") {
-                        cmds.next();
+                    if i < cmds.len() && cmds[i] == "~" {
+                        i += 1;
                         let key = "HOME";
                         if let Some(home_path) = env::var_os(key) {
                             if let Err(_) = env::set_current_dir(&home_path) {
@@ -115,10 +126,13 @@ fn main() -> anyhow::Result<()> {
                             }
                         }
                     }
-                    if let Some(path) = cmds.next() {
+                    if i < cmds.len() {
+                        let path = &cmds[i];
+                        i += 1;
                         if let Err(_) = env::set_current_dir(path) {
                             print!("cd: {}: No such file or directory\n", path)
                         }
+                        _ = i; // NOTE: just to remove unused assignment warning
                     }
                 }
                 "pwd" => {
@@ -127,12 +141,15 @@ fn main() -> anyhow::Result<()> {
                     print!("{}\n", pwd);
                 }
                 "type" => {
-                    if let Some(cmd) = cmds.next() {
-                        if BUILTIN_CMDS.contains(&cmd) {
+                    if i < cmds.len() {
+                        let cmd = &cmds[i];
+                        i += 1;
+                        _ = i;
+                        if BUILTIN_CMDS.contains(&cmd.as_str()) {
                             print!("{} is a shell builtin\n", cmd);
                         } else {
                             let path_cmds = path_cmds()?;
-                            if path_cmds.contains_key(cmd) {
+                            if path_cmds.contains_key(cmd.as_str()) {
                                 let path = &path_cmds[cmd];
                                 print!("{} is {}/{}\n", cmd, path, cmd)
                             } else {
@@ -143,20 +160,22 @@ fn main() -> anyhow::Result<()> {
                 }
                 "echo" => {
                     loop {
-                        if let Some(c) = cmds.next() {
-                            print!("{}", c);
-                            if cmds.peek() != None {
-                                print!(" ");
-                            }
-                        } else {
+                        if i == cmds.len() {
                             break;
                         }
+                        print!("{}", cmds[i]);
+                        if i != cmds.len() - 1 {
+                            print!(" ");
+                        }
+                        i += 1;
                     }
                     print!("\n");
                 }
                 "exit" => {
-                    if let Some(es) = cmds.next() {
-                        exit_status = es.parse().unwrap();
+                    if i < cmds.len() {
+                        exit_status = cmds[i].parse().unwrap_or_default();
+                        i += 1;
+                        _ = i;
                     }
                     std::process::exit(exit_status);
                 }
@@ -165,7 +184,7 @@ fn main() -> anyhow::Result<()> {
                     if path_cmds.contains_key(cmd) {
                         let path = format!("{}/{}", path_cmds[cmd], cmd);
                         Command::new(path)
-                            .args(cmds)
+                            .args(&cmds[i..])
                             .status()
                             .expect("failed to execute process");
                     } else {
@@ -184,7 +203,11 @@ fn path_cmds() -> anyhow::Result<HashMap<String, String>> {
     let key = "PATH";
     if let Some(paths) = env::var_os(key) {
         for path in env::split_paths(&paths) {
-            for entry in fs::read_dir(&path)? {
+            let dir = match fs::read_dir(&path) {
+                Ok(d) => d,
+                Err(_) => continue,
+            };
+            for entry in dir {
                 let entry = entry?;
                 if entry.path().is_file() {
                     let cmd = entry

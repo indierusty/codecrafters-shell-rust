@@ -1,0 +1,29 @@
+warning: value assigned to `i` is never read
+   --> src/main.rs:131:25
+    |
+131 |                         i += 1;
+    |                         ^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` on by default
+
+warning: value assigned to `i` is never read
+   --> src/main.rs:145:25
+    |
+145 |                         i += 1;
+    |                         ^
+    |
+    = help: maybe it is overwritten before being read?
+
+warning: value assigned to `i` is never read
+   --> src/main.rs:175:25
+    |
+175 |                         i += 1;
+    |                         ^
+    |
+    = help: maybe it is overwritten before being read?
+
+warning: `codecrafters-shell` (bin "codecrafters-shell") generated 3 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running `target/debug/codecrafters-shell`
+Error: No such file or directory (os error 2)

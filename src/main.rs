@@ -295,6 +295,7 @@ fn write(mode: &RedirectionMode, std_type: Channel, src: &[u8]) {
         },
         RedirectionMode::Append(path) => {
             let mut file = OpenOptions::new()
+                .create(true)
                 .write(true)
                 .append(true)
                 .open(path)
